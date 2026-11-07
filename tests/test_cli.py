@@ -62,3 +62,35 @@ def test_missing_folder(tmp_path, capsys):
 def test_empty_folder(tmp_path, capsys):
     assert main(["run", str(tmp_path), "--yes"]) == 0
     assert "Nothing to move." in capsys.readouterr().out
+
+
+
+
+
+def test_history_and_undo_on_damaged_journal(tmp_path, capsys):
+    history_file = tmp_path / ".tidydir" / "history.jsonl"
+    history_file.parent.mkdir()
+    history_file.write_text('{broken\n', encoding="utf-8")
+
+    assert main(["history", str(tmp_path)]) == 1
+    err = capsys.readouterr().err
+    assert "the undo journal is damaged at line 1" in err
+
+    assert main(["undo", str(tmp_path)]) == 1
+    err2 = capsys.readouterr().err
+    assert "the undo journal is damaged at line 1" in err2
+
+
+def test_history_shows_readable_runs_before_damaged_line(tmp_path, capsys):
+    history_file = tmp_path / ".tidydir" / "history.jsonl"
+    history_file.parent.mkdir()
+    history_file.write_text(
+        '{"id": "20261107-120000", "timestamp": 1700000000.0, "moves": [["x.jpg", "Images/x.jpg"]]}\n{corrupt\n',
+        encoding="utf-8",
+    )
+
+    assert main(["history", str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert "20261107-120000" in captured.out
+    assert "1 file(s)" in captured.out
+    assert "the undo journal is damaged at line 2" in captured.err

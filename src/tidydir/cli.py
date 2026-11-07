@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import __version__
 from .config import CONFIG_FILENAME, DEFAULT_CONFIG, ConfigError, find_config
-from .journal import apply_plan, read_history, undo_last
+from .journal import JournalError, apply_plan, read_history, undo_last
 from .planner import Plan, PlanError, build_plan
 
 
@@ -112,7 +112,15 @@ def _cmd_undo(args: argparse.Namespace) -> int:
 
 
 def _cmd_history(args: argparse.Namespace) -> int:
-    history = read_history(args.directory.resolve())
+    try:
+        history = read_history(args.directory.resolve())
+    except JournalError as exc:
+        for record in reversed(exc.records):
+            when = datetime.fromtimestamp(record.timestamp)
+            print(f"{record.id}  {when:%Y-%m-%d %H:%M}  {len(record.moves)} file(s)")
+        print(f"tidydir: {exc}", file=sys.stderr)
+        return 1
+
     if not history:
         print("No runs recorded.")
         return 0
@@ -138,6 +146,6 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     try:
         return COMMANDS[args.command](args)
-    except (ConfigError, PlanError, OSError) as exc:
+    except (ConfigError, PlanError, JournalError, OSError) as exc:
         print(f"tidydir: {exc}", file=sys.stderr)
         return 1

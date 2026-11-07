@@ -3,7 +3,7 @@ from datetime import datetime
 import pytest
 
 from conftest import touch
-from tidydir.journal import apply_plan, read_history, undo_last
+from tidydir.journal import JournalError, apply_plan, read_history, undo_last
 from tidydir.planner import build_plan
 
 
@@ -81,3 +81,19 @@ def test_undo_goes_newest_first(tmp_path, config):
     assert undo_last(tmp_path).restored == ["b.png"]
     assert (tmp_path / "Images" / "a.jpg").exists()
     assert len(read_history(tmp_path)) == 1
+
+
+
+
+
+def test_damaged_journal_raises_journal_error(tmp_path):
+    history_file = tmp_path / ".tidydir" / "history.jsonl"
+    history_file.parent.mkdir()
+    history_file.write_text(
+        '{"id": "r1", "timestamp": 123.0, "moves": [["a.txt", "Text/a.txt"]]}\n{broken\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(JournalError, match="the undo journal is damaged at line 2") as exc_info:
+        read_history(tmp_path)
+    assert len(exc_info.value.records) == 1
+    assert exc_info.value.records[0].id == "r1"

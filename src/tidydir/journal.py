@@ -18,6 +18,14 @@ JOURNAL_DIR = ".tidydir"
 JOURNAL_FILE = "history.jsonl"
 
 
+class JournalError(ValueError):
+    """Raised when the undo journal is corrupt or unreadable."""
+
+    def __init__(self, message: str, records: tuple[RunRecord, ...] = ()) -> None:
+        super().__init__(message)
+        self.records = records
+
+
 @dataclass(frozen=True)
 class RunRecord:
     id: str
@@ -51,7 +59,17 @@ def read_history(root: Path) -> list[RunRecord]:
     if not path.exists():
         return []
     lines = path.read_text(encoding="utf-8").splitlines()
-    return [RunRecord.from_json(line) for line in lines if line.strip()]
+    records: list[RunRecord] = []
+    for lineno, line in enumerate(lines, start=1):
+        if not line.strip():
+            continue
+        try:
+            records.append(RunRecord.from_json(line))
+        except (ValueError, KeyError, TypeError) as exc:
+            raise JournalError(
+                f"the undo journal is damaged at line {lineno}", records=tuple(records)
+            ) from exc
+    return records
 
 
 def _write_history(root: Path, records: Iterable[RunRecord]) -> None:

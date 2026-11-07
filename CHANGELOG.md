@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- Report damaged lines in `.tidydir/history.jsonl` with line numbers and exit code 1 instead of crashing with a traceback (#34).
+
 ### Added
 
 - `exclude` patterns, under `[settings]` (applies to every rule) and per rule.
